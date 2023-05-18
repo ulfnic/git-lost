@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+
+set -o errexit
+
+
+
+print_stderr() {
+	[[ $2 ]] && printf "$2" "${@:3}" 1>&2
+	[[ $1 == '0' ]] || exit $1
+}
+
+
+
+commit_id_format=
+no_color=
+while [[ $1 ]]; do
+	case $1 in
+		'--short-id'|'-s')
+			commit_id_format='%h';;
+		'--long-id'|'-l')
+			commit_id_format='%H';;
+		'--no-color')
+			no_color=1;;
+		*)
+			print_stderr '%s\n' 'Unrecognized parameter: '"$1"
+			exit 1
+			;;
+	esac
+	shift
+done
+
+
+
+# Define defaults
+: ${commit_id_format:='%H'}
+
+# If the shell is non-interactive or there's a NO_COLOR=1 export don't use color sequences
+if [[ $BASH_VERSION ]] || [[ $NO_COLOR == '1' ]]; then
+	no_color=1
+fi
+
+
+
+# Gather the commit id of every referenced commit
+declare -A referenced_commits
+while read commit_id _; do
+	referenced_commits[$commit_id]=1
+done <<< $(git log --all --format=format:"$commit_id_format")
+
+
+
+# Print the details of all commits ignoring referenced commits leaving only orphaned commits
+declare -A orphaned_commits
+while read commit_id date1 date2 date3 email subject; do
+
+	# Ignore referenced commits and duplicates
+	[[ ${referenced_commits[$commit_id]} ]] && continue
+	[[ ${orphaned_commits[$commit_id]} ]] && continue
+	orphaned_commits[$commit_id]=1
+
+	# Print commit details
+	if [[ $no_color ]]; then
+		printf '%s\n' "$date1 $date2 $date3 $commit_id $email: $subject"
+	else
+		printf '\e[32m%s %s %s\e[0m \e[34m%s\e[0m \e[38;5;244m%s\e[0m %s\n' "$date1" "$date2" "$date3" "$commit_id" "$email:" "$subject"
+	fi
+
+done <<< $(git reflog --all --format=format:"$commit_id_format"' %ci %ae %f') | sort
+
+
+
