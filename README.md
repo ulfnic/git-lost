@@ -19,6 +19,3 @@ git-lost
 
 ## Dependencies
 git
-
-## License
-Licensed under Zero-Clause BSD (0BSD). See LICENSE for details.
